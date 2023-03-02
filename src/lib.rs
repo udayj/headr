@@ -50,13 +50,20 @@ pub fn get_args() -> MyResult<Config> {
                     .get_matches();
 
     let files = matches.values_of_lossy("files").unwrap();
-    let lines:usize = matches.value_of("lines").unwrap().parse().unwrap();
-
+    let lines = matches.value_of("lines")
+                                     .map(parse_positive_int)
+                                     .transpose()
+                                     .map_err(|e| format!("illegal line count -- {}",e ))?;
+    
+    let bytes = matches.value_of("bytes")
+                                     .map(parse_positive_int)
+                                     .transpose()
+                                     .map_err(|e| format!("illegal byte count -- {}", e))?;
     Ok (
         Config {
-            files: files,
-            lines: lines,
-            bytes: Some(0)
+            files,
+            lines: lines.unwrap(),
+            bytes
         }
     )
 }
@@ -67,7 +74,7 @@ fn parse_positive_int(val: &str) -> MyResult<usize> {
     let parsed_val = val.parse::<usize>();
     if parsed_val.is_ok() {
         let ret_val = parsed_val.unwrap();
-        if (ret_val > 0) {
+        if ret_val > 0 {
             return Ok(ret_val);
         }
         else { 
