@@ -1,5 +1,7 @@
 use clap::{App, Arg};
 use std::error::Error;
+use std::fs::File;
+use std::io::{self,BufRead, BufReader};
 
 type MyResult<T> = Result<T, Box< dyn Error>>;
 
@@ -13,10 +15,69 @@ pub struct Config {
 
 pub fn run(config: Config) -> MyResult<()> {
 
-    println!("{:#?}", config);
+    let mut prev_status = false;
+    for filename in &config.files {
+
+        match open(&filename) {
+            Err(err) => {
+                eprintln!("{}: {}", filename, err);
+                prev_status = false;
+            }
+            Ok(reader) => {
+
+            match config.bytes {
+            
+            None => {
+                if prev_status {
+                    println!();
+                }
+                prev_status = true;
+                if (&filename[..] != "-" && &config.files.len() > &1 ) {
+                    println!("==> {} <==", filename);
+                }
+                for (line_num, line) in reader.lines().enumerate() {
+
+                    if line_num == config.lines {
+                        println!();
+                        break;
+                    }
+                    println!("{}", line.unwrap());
+                }
+            },
+            Some (n) => {
+
+                if prev_status {
+                    println!();
+                }
+                prev_status = true;
+                if (&filename[..] != "-" && &config.files.len() > &1 ) {
+                    println!("==> {} <==", filename);
+                }
+                reader = reader as Box<BufReader<File>>;
+                for (byte_num, exact_byte) in reader.bytes().enumerate() {
+
+                    if byte_num == n {
+                        println!();
+                        break;
+                    }
+                    println!("{}", exact_byte);
+                }
+            }
+            }
+            }
+        }
+    }
+    
     Ok(())
 }
 
+fn open(filename: &str) -> MyResult<Box <dyn BufRead>> {
+
+    match filename {
+        "-" => Ok(Box::new(BufReader::new(io::stdin()))),
+        _ => Ok(Box::new(BufReader::new(File::open(filename)?)))
+    }
+}
 pub fn get_args() -> MyResult<Config> {
 
     let matches = App::new("headr")
