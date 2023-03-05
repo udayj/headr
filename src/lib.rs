@@ -1,7 +1,8 @@
 use clap::{App, Arg};
 use std::error::Error;
 use std::fs::File;
-use std::io::{self,BufRead, BufReader};
+use std::io::{self,BufRead, BufReader, Take};
+use std::any::Any;
 
 type MyResult<T> = Result<T, Box< dyn Error>>;
 
@@ -16,54 +17,37 @@ pub struct Config {
 pub fn run(config: Config) -> MyResult<()> {
 
     let mut prev_status = false;
-    for filename in &config.files {
+    for filename in config.files {
 
         match open(&filename) {
             Err(err) => {
                 eprintln!("{}: {}", filename, err);
                 prev_status = false;
             }
-            Ok(reader) => {
+            Ok(mut file) => {
 
-            match config.bytes {
-            
-            None => {
-                if prev_status {
-                    println!();
-                }
-                prev_status = true;
-                if (&filename[..] != "-" && &config.files.len() > &1 ) {
-                    println!("==> {} <==", filename);
-                }
-                for (line_num, line) in reader.lines().enumerate() {
+                if let Some(num_bytes) = config.bytes  {
 
-                    if line_num == config.lines {
-                        println!();
+                    let mut handle= (&mut file).take(num_bytes as u64);
+                    let mut buffer = vec![0; num_bytes];
+                    let bytes_read = handle.read(&mut buffer)?;
+                    file.bytes().take(num_bytes).collect();
+
+                }
+
+                let mut line = String::new();
+
+                for _ in 0..config.lines {
+
+                    let bytes = file.read_line(&mut line)?;
+                    if bytes == 0 {
                         break;
                     }
-                    println!("{}", line.unwrap());
-                }
-            },
-            Some (n) => {
 
-                if prev_status {
-                    println!();
+                    print!("{}", line);
+                    line.clear();
                 }
-                prev_status = true;
-                if (&filename[..] != "-" && &config.files.len() > &1 ) {
-                    println!("==> {} <==", filename);
-                }
-                reader = reader as Box<BufReader<File>>;
-                for (byte_num, exact_byte) in reader.bytes().enumerate() {
-
-                    if byte_num == n {
-                        println!();
-                        break;
-                    }
-                    println!("{}", exact_byte);
-                }
-            }
-            }
+                
             }
         }
     }
